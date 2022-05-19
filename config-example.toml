@@ -1,0 +1,33 @@
+interval = 1800 # interval (in seconds) for check command 检查间隔(秒)
+res_api = "dmhy"
+
+
+#[proxy] # proxy if needed
+#scheme = "http://192.168.50.1:10080" # http & socks5 are supported (by reqwest)
+#username = "admin"
+#password = "123000"
+
+
+[downloader]
+type = "transmission"
+url = "https://192.168.1.1:8080/transmission/rpc"
+user = "admin"
+password = "123000"
+
+# use `muuf res search` first to test
+[[rules]]
+name = "DateALive" # will be the name of download folder 会成为下载文件夹名称
+keywords = ["Date", "IV"] # keywords for search 搜索的关键字
+res_api = "dmhy"
+sub_group_id = 604 # [Optional]sub group id for search [可选]字幕组id
+res_type_id = 2 # [Optional]res type id for search [可选]资源类型id
+#sub_group_name = "c.c"
+#res_type_name = "动画"
+
+# multiple rules can be added
+# [[rules]]
+# name = "DateALive"
+# keywords = ["Date"]
+# res_api = "dmhy"
+
+
