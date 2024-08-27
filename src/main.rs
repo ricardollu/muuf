@@ -14,7 +14,7 @@ use base64::{engine::general_purpose, Engine};
 use clap::{Parser, Subcommand};
 use color_eyre::eyre::Result;
 use config::Config;
-use http::Method;
+use http::{header, Method};
 use muuf::{
     config::{Collection, Matcher, Mikan, SeasonFolder, SpecialMapping},
     dl::Client,
@@ -63,8 +63,24 @@ async fn watch() {
 
 async fn serve() {
     let cors = CorsLayer::new()
-        // allow `GET` and `POST` when accessing the resource
-        .allow_methods([Method::GET, Method::POST])
+        .allow_headers(vec![
+            header::ACCEPT,
+            header::ACCEPT_LANGUAGE,
+            header::AUTHORIZATION,
+            header::CONTENT_LANGUAGE,
+            header::CONTENT_TYPE,
+        ])
+        .allow_methods(vec![
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::DELETE,
+            Method::HEAD,
+            Method::OPTIONS,
+            Method::CONNECT,
+            Method::PATCH,
+            Method::TRACE,
+        ])
         // allow requests from any origin
         .allow_origin(Any);
 
@@ -79,7 +95,7 @@ async fn serve() {
         .route("/rm-collection", post(rm_collection));
 
     // run it with hyper on localhost:3000
-    let port = 3000;
+    let port = 8080;
     let listener = TcpListener::bind(format!("0.0.0.0:{port}")).await.unwrap();
     info!("Listening on port:{port}");
     axum::serve(listener, app.layer(cors)).await.unwrap();
