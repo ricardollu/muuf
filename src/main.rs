@@ -87,6 +87,7 @@ async fn serve() {
     // build our application with a single route
     let app = Router::new()
         .route("/", any(|| async { "Hello, World!" }))
+        .route("/request-check", post(request_check))
         .route("/mikan", get(find_mikan))
         .route("/add-mikan", post(add_mikan))
         .route("/rm-mikan", post(rm_mikan))
@@ -182,6 +183,11 @@ async fn rm_collection(Json(form): Json<RmCollectionForm>) -> (StatusCode, Json<
         Err(e) => to_resp(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
         Ok(_) => to_resp(StatusCode::OK, "rm sucess".to_string()),
     }
+}
+
+async fn request_check() -> (StatusCode, Json<ApiResponse>) {
+    check();
+    to_resp(StatusCode::OK, "check requested".to_string())
 }
 
 async fn check() -> Result<()> {
