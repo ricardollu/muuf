@@ -95,7 +95,7 @@ async fn serve() {
         .route("/rm-collection", post(rm_collection));
 
     // run it with hyper on localhost:3000
-    let port = 8080;
+    let port = 3000;
     let listener = TcpListener::bind(format!("0.0.0.0:{port}")).await.unwrap();
     info!("Listening on port:{port}");
     axum::serve(listener, app.layer(cors)).await.unwrap();
