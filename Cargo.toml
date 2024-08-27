@@ -25,6 +25,8 @@ lava_torrent = "0.11"
 bytes = "1.7"
 futures = "0.3"
 axum = "0.7"
+tower-http = { version = "0.5", features = ["cors"] }
+http = "1"
 color-eyre = "0.6.2"
 tokio-util = "0.7.10"
 tracing-error = "0.2.0"

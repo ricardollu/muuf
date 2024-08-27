@@ -14,6 +14,7 @@ use base64::{engine::general_purpose, Engine};
 use clap::{Parser, Subcommand};
 use color_eyre::eyre::Result;
 use config::Config;
+use http::Method;
 use muuf::{
     config::{Collection, Matcher, Mikan, SeasonFolder, SpecialMapping},
     dl::Client,
@@ -23,6 +24,7 @@ use muuf::{
 use res::ApiServer;
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
+use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
 
 const VIDEO_EXTS: [&str; 2] = ["mp4", "mkv"];
@@ -60,6 +62,12 @@ async fn watch() {
 }
 
 async fn serve() {
+    let cors = CorsLayer::new()
+        // allow `GET` and `POST` when accessing the resource
+        .allow_methods([Method::GET, Method::POST])
+        // allow requests from any origin
+        .allow_origin(Any);
+
     // build our application with a single route
     let app = Router::new()
         .route("/", any(|| async { "Hello, World!" }))
@@ -71,8 +79,10 @@ async fn serve() {
         .route("/rm-collection", post(rm_collection));
 
     // run it with hyper on localhost:3000
-    let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    let port = 3000;
+    let listener = TcpListener::bind(format!("0.0.0.0:{port}")).await.unwrap();
+    info!("Listening on port:{port}");
+    axum::serve(listener, app.layer(cors)).await.unwrap();
 }
 
 #[derive(Serialize)]
