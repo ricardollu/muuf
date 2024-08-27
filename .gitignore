@@ -1,0 +1,7 @@
+/target
+muuf.toml
+.cargo
+.idea
+sqlite.*
+/data
+.envrc

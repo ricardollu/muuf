@@ -1,0 +1,38 @@
+# TODO: config file location
+
+
+check_interval = 1800 # interval (in seconds) for check command 检查间隔(秒)
+res_api = "dmhy"
+
+
+#[proxy] # proxy if needed
+#scheme = "http://192.168.50.1:10080" # http & socks5 are supported (by reqwest)
+#username = "admin"
+#password = "123000"
+
+
+[downloader]
+type = "transmission"
+url = "https://192.168.1.1:8080/transmission/rpc"
+user = "admin"
+password = "123000"
+
+#[[mikan]]
+#url="https://mikanani.me/RSS/Bangumi?bangumiId=2995&subgroupid=611"
+#name="【我推的孩子】"
+#title_contain=[
+#    "繁日内嵌"
+#]
+#extra = [{ title = "[北宇治字幕组&霜庭云花Sub&氢气烤肉架]【我推的孩子】/【Oshi no ko】[11][Webrip][1080p][HEVC_AAC][繁日内嵌]", url = "https://mikanani.me/Download/20230711/3f99e5312f02fd82d87a7829eec368019de4a476.torrent" }]
+#skip = [{ title = "[北宇治字幕组&霜庭云花Sub&氢气烤肉架]【我推的孩子】/【Oshi no ko】[11][Webrip][1080p][HEVC_AAC][繁日内嵌]", url = "https://mikanani.me/Download/20230711/3f99e5312f02fd82d87a7829eec368019de4a476.torrent" }]
+#external_subtitle = false
+
+#[[collections]]
+#torrent_url = "https://bangumi.moe/download/torrent/64d8613b6533870007b269cc/[VCB-Studio]%20%E6%83%B3%E8%A6%81%E6%88%90%E4%B8%BA%E5%BD%B1%E4%B9%8B%E5%AE%9E%E5%8A%9B%E8%80%85%EF%BC%81_%20Kage%20no%20Jitsuryokusha%20ni%20Naritakute!%20_%20%E9%99%B0%E3%81%AE%E5%AE%9F%E5%8A%9B%E8%80%85%E3%81%AB%E3%81%AA%E3%82%8A%E3%81%9F%E3%81%8F%E3%81%A6!%2010-bit%201080p%20HEVC%20BDRip%20[Reseed%20Fin].torrent"
+#name = "想要成为影之实力者！"
+#title = "Kage no Jitsuryokusha ni Naritakute! / 想要成为影之实力者！10-bit 1080p HEVC BDRip [Reseed Fin]"
+#season_folders = [{ folder = '', season = 1 }]
+#special_mappings = [
+#    { file_name = '\[VCB-Studio\] Kage no Jitsuryokusha ni Naritakute! \[SP(\d+)\]\[Ma10p_1080p\]\[x265_flac\]\.mkv', name = "影实！行动#{1}", match_and_replace = true },
+#]
+#external_subtitle = false
