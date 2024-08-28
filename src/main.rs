@@ -25,7 +25,7 @@ use res::ApiServer;
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
-use tracing::info;
+use tracing::{error, info};
 
 const VIDEO_EXTS: [&str; 2] = ["mp4", "mkv"];
 
@@ -192,7 +192,11 @@ async fn request_check() -> (StatusCode, Json<ApiResponse>) {
 
 async fn check() -> Result<()> {
     let config = Config::load()?;
-    check_with_config(&config).await
+    let result = check_with_config(&config).await;
+    if let Err(e) = &result {
+        error!("{:?}", e);
+    }
+    result
 }
 
 async fn check_with_config(config: &Config) -> Result<()> {
@@ -235,7 +239,7 @@ async fn check_res_rules(
     added_torrent_hashs: &mut Vec<String>,
     rules: &[config::Rule],
 ) -> Result<()> {
-    println!("{} rules to be checked", rules.len());
+    info!("{} rules to be checked", rules.len());
     for rule in rules.iter() {
         let res_api = res::get_res_api(&rule.res_api);
         let (res_list, _) = res_api
@@ -270,7 +274,7 @@ async fn check_mikan_rss(
     mikan: &[Mikan],
     maybe_link: &Option<config::Link>,
 ) -> Result<()> {
-    println!("{} mikan rss to be checked", mikan.len());
+    info!("{} mikan rss to be checked", mikan.len());
     for m in mikan {
         let mut ts = parse_mikan(&m.url).await?;
         for e in &m.extra {
@@ -399,6 +403,10 @@ async fn check_mikan_rss(
         }
     }
 
+    if !mikan.is_empty() {
+        info!("done checking mikan")
+    }
+
     Ok(())
 }
 
@@ -409,7 +417,7 @@ async fn check_collections(
     collections: &[Collection],
     maybe_link: &Option<config::Link>,
 ) -> Result<()> {
-    println!("{} collection to be checked", collections.len());
+    info!("{} collection to be checked", collections.len());
     for Collection {
         name,
         torrent_url,
@@ -545,6 +553,10 @@ async fn check_collections(
             .await?;
         added_torrent_hashs.push(torrent.info_hash());
         println!("加入下载列表: {}", title)
+    }
+
+    if !collections.is_empty() {
+        info!("done checking collections")
     }
 
     Ok(())
