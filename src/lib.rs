@@ -27,8 +27,7 @@ pub async fn get_url_bytes(url: &str) -> Result<Bytes> {
     CLIENT
         .get(url)
         .send()
-        .await
-        .unwrap()
+        .await?
         .bytes()
         .await
         .map_err(|e| e.into())
