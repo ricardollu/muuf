@@ -473,7 +473,7 @@ pub fn process(title: &str) -> Result<Episode> {
                 let remain = block[ep_from_name_reg.find(block).unwrap().end()..].trim();
                 if !remain.is_empty() {
                     // println!("remain:{}", &remain);
-                    bail!("can't understand episode number")
+                    bail!("can't understand episode number for title: {}", title)
                 }
                 *block = block[..ep_from_name_reg.find(block).unwrap().start()].to_string();
                 maybe_name_block_end_index = Some(index + 1);
@@ -483,10 +483,10 @@ pub fn process(title: &str) -> Result<Episode> {
     }
 
     if maybe_ep.is_none() {
-        bail!("can't find episode number");
+        bail!("can't find episode number for title: {}", title);
     }
     if maybe_name_block_end_index.is_none() {
-        bail!("can't find name block");
+        bail!("can't find name block for title: {}", title);
     }
 
     let name_block_end_index = maybe_name_block_end_index.unwrap();
