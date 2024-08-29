@@ -4,6 +4,7 @@ pub mod dl;
 pub mod parser;
 pub mod res;
 pub mod rss;
+pub mod serve;
 
 use bytes::Bytes;
 use color_eyre::eyre::Result;
