@@ -1,0 +1,153 @@
+use std::{fs, path::Path};
+
+use base64::{engine::general_purpose, Engine};
+use color_eyre::eyre::{bail, Result};
+
+use crate::{
+    checker::VIDEO_EXTS,
+    config::{Collection, Link, Matcher, SeasonFolder, SpecialMapping},
+    dl::{Client, Torrent},
+    get_url_bytes, parser,
+};
+
+pub async fn check_collection(
+    collection: &Collection,
+    dl_client: &mut dyn Client,
+    dl_server_torrents: &[Torrent],
+    added_torrent_hashs: &mut Vec<String>,
+    maybe_link: &Option<Link>,
+) -> Result<()> {
+    let Collection {
+        name,
+        torrent_url,
+        title,
+        season_folders,
+        special_mappings,
+        external_subtitle,
+    } = collection;
+    let bytes = get_url_bytes(torrent_url).await?;
+    let torrent = lava_torrent::torrent::v1::Torrent::read_from_bytes(&bytes)?;
+    // If the torrent contains only 1 file then files is None.
+    if torrent.files.is_none() {
+        bail!("不是多文件种子: {}", title);
+    }
+
+    let some_server_torrent = dl_server_torrents
+        .iter()
+        .find(|t| t.hash == torrent.info_hash());
+    if let Some(server_torrent) = some_server_torrent {
+        if let Some(link_config) = maybe_link {
+            if link_config.enable && server_torrent.percent_done >= 1.0 {
+                for file in torrent.files.as_ref().unwrap() {
+                    let file_name_from_torrent = file.path.file_name().unwrap().to_str().unwrap();
+                    let file_suffix = file.path.extension().unwrap().to_str().unwrap();
+                    if VIDEO_EXTS.iter().all(|ext| ext != &file_suffix) {
+                        continue;
+                    }
+                    let file_stem = file.path.file_stem().unwrap().to_str().unwrap();
+
+                    let season;
+                    let link_file_name;
+
+                    if let Some(SpecialMapping { name, matcher, .. }) =
+                        special_mappings.iter().find(|sm| match &sm.matcher {
+                            Matcher::Off => sm.file_name == file_name_from_torrent,
+                            Matcher::On(regex) => regex.is_match(file_name_from_torrent),
+                        })
+                    {
+                        season = &0_u8;
+                        match matcher {
+                            Matcher::Off => link_file_name = name.to_string(),
+                            Matcher::On(regex) => {
+                                let captures = regex.captures(file_name_from_torrent).unwrap();
+                                let mut name = name.to_string();
+                                for (i, cap) in captures.iter().enumerate() {
+                                    if i == 0 {
+                                        continue;
+                                    }
+                                    name = name.replace(&format!("{{{i}}}"), cap.unwrap().as_str())
+                                }
+                                link_file_name = name;
+                            }
+                        }
+                    } else {
+                        let parent = file.path.parent().unwrap().to_str().unwrap();
+                        let maybe_season = if let Some(SeasonFolder { season, .. }) =
+                            season_folders.iter().find(|sf| sf.folder == parent)
+                        {
+                            Some(season)
+                        } else {
+                            None
+                        };
+                        if maybe_season.is_none() {
+                            continue;
+                        }
+                        season = maybe_season.unwrap();
+                        let maybe_real_ep = parser::process(file_name_from_torrent);
+                        if maybe_real_ep.is_err() {
+                            println!(
+                                "{file_name_from_torrent} 解析失败: {}",
+                                maybe_real_ep.err().unwrap()
+                            );
+                            continue;
+                        }
+                        let ep = maybe_real_ep.unwrap().episode;
+                        link_file_name = parser::link_file_name(name, season, &ep);
+                    }
+
+                    let path = parser::link_path(name, season);
+                    let full_path = format!("{}/{path}", &link_config.path);
+                    let full_file_name = format!("{}.{file_suffix}", link_file_name);
+                    let link = format!("{full_path}/{full_file_name}");
+                    if !Path::new(&link).exists() {
+                        let original = format!(
+                            "{}/{}/{}",
+                            &server_torrent.download_dir,
+                            &torrent.name,
+                            file.path.to_str().unwrap()
+                        );
+                        if link_config.dry_run {
+                            println!("准备链接{link} <- {original}",);
+                        } else {
+                            fs::create_dir_all(&full_path)?;
+                            match fs::hard_link(&original, &link) {
+                                Ok(_) => {
+                                    println!(
+                                        "创建链接{link} <- {}/{file_name_from_torrent}",
+                                        &torrent.name
+                                    );
+                                }
+                                Err(e) => println!("硬链接失败: {} 当{link} <- {original}", e),
+                            }
+                        }
+                    }
+
+                    // 外挂字幕
+                    if *external_subtitle {
+                        parser::link_external_subtitle(
+                            &torrent,
+                            file_stem,
+                            &full_path,
+                            &link_file_name,
+                            link_config,
+                            server_torrent,
+                        )?
+                    }
+                }
+            }
+        }
+
+        return Ok(());
+    }
+    if added_torrent_hashs.contains(&torrent.info_hash()) {
+        println!("{} 刚刚已经被加入下载了", title);
+        return Ok(());
+    }
+    dl_client
+        .torrent_add_by_meta(general_purpose::STANDARD.encode(bytes), name)
+        .await?;
+    added_torrent_hashs.push(torrent.info_hash());
+    println!("加入下载列表: {}", title);
+
+    Ok(())
+}
