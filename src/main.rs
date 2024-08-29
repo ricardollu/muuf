@@ -7,7 +7,7 @@ use tracing::info;
 async fn main() -> Result<()> {
     color_eyre::install()?;
     initialize_logging_from_crate_name()?;
-    info!("muuf started");
+    info!("muuf started, version: {}", env!("CARGO_PKG_VERSION"));
     let cli = Cli::parse();
     match cli.commands {
         Commands::Watch => watch().await,
@@ -21,6 +21,7 @@ async fn main() -> Result<()> {
 
 fn validate() {
     let _ = Config::load().unwrap();
+    info!("Config is valid");
 }
 
 async fn watch() {
