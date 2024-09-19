@@ -19,20 +19,6 @@ use crate::{
    协议: MIT
 */
 
-static EPISODE_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\d+").unwrap());
-/*
- * 例如:
- * - 1
- * [1]
- * [1 v1]
- * 第1话
- * [第1话]
- * [1 END]
- * [ep1]
- */
-static TITLE_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(.*|\[.*])( -? \d+|\[\d+]|\[\d+.?[vV]\d]|第\d+[话話集]|\[第?\d+[话話集]]|\[\d+.?END]|[Ee][Pp]?\d+)(.*)").unwrap()
-});
 static RESOLUTION_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"1080|720|2160|4K").unwrap());
 static SOURCE_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"B-Global|[Bb]aha|[Bb]ilibili|AT-X|Web").unwrap());
@@ -59,85 +45,6 @@ static CHINESE_NUMBER_MAP: LazyLock<HashMap<&'static str, u8>> = LazyLock::new(|
     map.insert("十", 10);
     map
 });
-
-fn get_group(name: &str) -> &str {
-    Regex::new(r"[\[\]]").unwrap().split(name).nth(1).unwrap()
-}
-
-fn pre_process(raw_name: &str) -> String {
-    raw_name.replace('【', "[").replace('】', "]")
-}
-
-fn prefix_process(raw: &str, group: &str) -> String {
-    // 去除字幕组信息
-    let raw = Regex::new(&format!(".{group}."))
-        .unwrap()
-        .replace_all(raw, "")
-        .to_string();
-    // 使用 [所有不是字母、数字、下划线、空格、汉字、日文假名、片假名和连字符的字符] 分割字符串
-    let raw_process = PREFIX_RE.replace_all(&raw, "/");
-    let arg_group: Vec<&str> = raw_process.split('/').filter(|s| !s.is_empty()).collect();
-
-    // 如果只有一个分割结果，那么就使用空格分割
-    let arg_group = if arg_group.len() == 1 {
-        arg_group.first().unwrap().split(' ').collect()
-    } else {
-        arg_group
-    };
-
-    // 去除 x月番、x月新番、港澳台地区
-    let rr = arg_group.iter().fold(raw.clone(), |acc, arg| {
-        if (Regex::new(r"新番|月?番").unwrap().is_match(arg) && arg.len() <= 11)
-            || Regex::new(r"港澳台地区").unwrap().is_match(arg)
-        {
-            Regex::new(&format!(".{arg}."))
-                .unwrap()
-                .replace_all(&acc, "")
-                .to_string()
-        } else {
-            acc
-        }
-    });
-
-    rr
-}
-
-fn season_process(season_info: &str) -> (String, String, u8) {
-    let season_rule = r"S\d{1,2}|Season \d{1,2}|[第 ].[季期部]";
-    let name_season = Regex::new(r"[\[\]]").unwrap().replace_all(season_info, " ");
-    let season_rule_reg = Regex::new(season_rule).unwrap();
-    let seasons: Vec<&str> = season_rule_reg
-        .find_iter(&name_season)
-        .map(|e| e.as_str())
-        .collect();
-    if seasons.is_empty() {
-        return (name_season.to_string(), "".to_string(), 1);
-    }
-    let name = season_rule_reg.replace_all(&name_season, "").to_string();
-    let en_search_reg = Regex::new(r"Season|S").unwrap();
-    let zh_search_reg = Regex::new(r"[第 ].[季期部]").unwrap();
-    let (season_raw, season) =
-        if let Some(season) = seasons.iter().find(|s| en_search_reg.is_match(s)) {
-            let season_int: u8 = en_search_reg
-                .replace_all(season, "")
-                .trim()
-                .parse()
-                .unwrap();
-            (season, season_int)
-        } else if let Some(season) = seasons.iter().find(|s| zh_search_reg.is_match(s)) {
-            // chinese number
-            let zh_replace_reg = Regex::new(r"[第季期部分 ]").unwrap();
-            let raw = zh_replace_reg.replace_all(season, "");
-            let season_int = match raw.parse::<u8>() {
-                Ok(season_int) => season_int,
-                Err(_) => *CHINESE_NUMBER_MAP.get(raw.to_string().as_str()).unwrap(),
-            };
-            (season, season_int)
-        } else {
-            (seasons.first().unwrap(), 1)
-        };
-    (name, season_raw.to_string(), season)
-}
 
 #[derive(Debug, PartialEq)]
 enum Lang {
@@ -240,14 +147,6 @@ fn name_process(name: &str) -> (Option<String>, Option<String>, Option<String>) 
     (name_en, name_zh, name_jp)
 }
 
-fn find_tags(other: &str) -> (Option<String>, Option<String>, Option<String>) {
-    let binding = Regex::new(r"[\[\]()（）]").unwrap().replace_all(other, " ");
-    let elements = binding.split(' ');
-    let iter = elements.filter(|e| e.trim() != "");
-
-    find_tags_from_iter(iter)
-}
-
 fn find_tags_from_iter<'a, T>(iter: T) -> (Option<String>, Option<String>, Option<String>)
 where
     T: IntoIterator<Item = &'a str>,
@@ -272,95 +171,6 @@ where
     });
 
     (sub, resolution, source)
-}
-
-pub fn process_legacy(raw_title: &str) -> Result<Episode> {
-    let raw_title = raw_title.trim();
-    let content_title = pre_process(raw_title);
-    // 预处理标题
-    let group = get_group(&content_title);
-
-    // println!("{}", content_title);
-    // 翻译组的名字
-    let match_obj = TITLE_RE.captures(&content_title).ok_or(eyre!(
-        "capture {} failed, with regex \n {}",
-        content_title,
-        TITLE_RE.as_str()
-    ))?;
-    //  处理标题
-    let matches = match_obj
-        .iter()
-        .map(|s| s.unwrap().as_str().trim())
-        .collect::<Vec<&str>>();
-    println!("{:?}", matches);
-
-    let season_info = matches.get(1).unwrap();
-    let episode_info = matches.get(2).unwrap();
-    let other = matches.get(3).unwrap();
-    let process_raw = prefix_process(season_info, group); // 处理 前缀
-    let (raw_name, _, season) = season_process(&process_raw); // 处理 第n季
-    let (name_en, name_zh, name_jp) = name_process(&raw_name);
-    // 处理 集数
-    let raw_episode = EPISODE_RE.find(episode_info);
-    let episode = if let Some(e) = raw_episode {
-        e.as_str().parse::<u32>().unwrap()
-    } else {
-        0
-    };
-    let (sub, dpi, source) = find_tags(other);
-    Ok(Episode {
-        sub_group: group.to_string(),
-        season,
-        name_en,
-        name_zh,
-        name_jp,
-        episode,
-        sub,
-        resolution: dpi,
-        source,
-    })
-}
-
-pub fn process_collection(raw_title: &str, reg: Regex) -> Result<Episode> {
-    let raw_title = raw_title.trim();
-    let content_title = pre_process(raw_title);
-    // 预处理标题
-    let group = get_group(&content_title);
-
-    // println!("{}", content_title);
-    // 翻译组的名字
-    let match_obj = reg.captures(&content_title).ok_or(eyre!(
-        "capture {} failed, with regex \n {}",
-        content_title,
-        TITLE_RE.as_str()
-    ))?;
-    //  处理标题
-    let matches = match_obj
-        .iter()
-        .map(|s| s.unwrap().as_str().trim())
-        .collect::<Vec<&str>>();
-    // println!("{:?}", matches);
-
-    let season_info = matches.get(1).unwrap();
-    let process_raw = prefix_process(season_info, group);
-    // 处理 前缀
-    let (raw_name, _, season) = season_process(&process_raw);
-    // 处理 第n季
-    let (name_en, name_zh, name_jp) = name_process(&raw_name);
-    // 处理 集数
-    let episode = 0;
-    let (sub, dpi, source) = find_tags(&process_raw);
-    Ok(Episode {
-        sub_group: group.to_string(),
-        season,
-        name_en,
-        name_zh,
-        name_jp,
-        episode,
-        sub,
-        resolution: dpi,
-        source,
-    })
 }
 
 /**
@@ -667,54 +477,40 @@ mod tests {
     fn test_parser() {
         let ep = process("【幻樱字幕组】【4月新番】【古见同学有交流障碍症 第二季 Komi-san wa, Komyushou Desu. S02】【22】【GB_MP4】【1920X1080】");
         assert!(ep.is_ok());
-        assert_eq!(
-            ep.unwrap(),
-            Episode {
-                sub_group: "幻樱字幕组".to_string(),
-                season: 2,
-                name_jp: None,
-                name_zh: Some("古见同学有交流障碍症".to_string()),
-                name_en: Some("Komi-san wa, Komyushou Desu.".to_string()),
-                episode: 22,
-                sub: Some("GB".to_string()),
-                resolution: Some("1920X1080".to_string()),
-                source: None,
-            }
-        );
+        let ep = ep.unwrap();
+        assert_eq!(ep.sub_group, "幻樱字幕组");
+        assert_eq!(ep.season, 2);
+        assert_eq!(ep.name_en, Some("Komi-san wa, Komyushou Desu.".to_string()));
+        assert_eq!(ep.name_zh, Some("古见同学有交流障碍症".to_string()));
+        assert_eq!(ep.episode, 22);
+        assert_eq!(ep.sub, Some("GB".to_string()));
+        assert_eq!(ep.resolution, Some("1920X1080".to_string()));
 
         let ep = process("[百冬练习组&LoliHouse] BanG Dream! 少女乐团派对！☆PICO FEVER！ / Garupa Pico: Fever! - 26 [WebRip 1080p HEVC-10bit AAC][简繁内封字幕][END] [101.69 MB]");
         assert!(ep.is_ok());
+        let ep = ep.unwrap();
+        assert_eq!(ep.sub_group, "百冬练习组&LoliHouse");
+        assert_eq!(ep.season, 1);
+        assert_eq!(ep.name_en, Some("Garupa Pico: Fever!".to_string()));
         assert_eq!(
-            ep.unwrap(),
-            Episode {
-                sub_group: "百冬练习组&LoliHouse".to_string(),
-                season: 1,
-                name_zh: Some("BanG Dream! 少女乐团派对！☆PICO FEVER！".to_string()),
-                name_jp: None,
-                name_en: Some("Garupa Pico: Fever!".to_string()),
-                episode: 26,
-                source: Some("WebRip".to_string()),
-                resolution: Some("1080p".to_string()),
-                sub: Some("简繁内封字幕".to_string()),
-            }
+            ep.name_zh,
+            Some("BanG Dream! 少女乐团派对！☆PICO FEVER！".to_string())
         );
+        assert_eq!(ep.episode, 26);
+        assert_eq!(ep.sub, Some("简繁内封字幕".to_string()));
+        assert_eq!(ep.resolution, Some("1080p".to_string()));
+        assert_eq!(ep.source, Some("WebRip".to_string()));
 
         let ep =  process("【喵萌奶茶屋】★04月新番★[夏日重现/Summer Time Rendering][11][1080p][繁日双语][招募翻译]");
         assert!(ep.is_ok());
-        assert_eq!(
-            ep.unwrap(),
-            Episode {
-                sub_group: "喵萌奶茶屋".to_string(),
-                season: 1,
-                name_en: Some("Summer Time Rendering".to_string()),
-                name_zh: Some("夏日重现".to_string()),
-                name_jp: None,
-                episode: 11,
-                sub: Some("繁日双语".to_string()),
-                resolution: Some("1080p".to_string()),
-                source: None,
-            }
-        );
+        let ep = ep.unwrap();
+        assert_eq!(ep.sub_group, "喵萌奶茶屋");
+        assert_eq!(ep.season, 1);
+        assert_eq!(ep.name_en, Some("Summer Time Rendering".to_string()));
+        assert_eq!(ep.name_zh, Some("夏日重现".to_string()));
+        assert_eq!(ep.episode, 11);
+        assert_eq!(ep.sub, Some("繁日双语".to_string()));
+        assert_eq!(ep.resolution, Some("1080p".to_string()));
 
         let ep = process("[Lilith-Raws] 关于我在无意间被隔壁的天使变成废柴这件事 / Otonari no Tenshi-sama - 09 [Baha][WEB-DL][1080p][AVC AAC][CHT][MP4]");
         assert!(ep.is_ok());
