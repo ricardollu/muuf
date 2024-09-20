@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Local};
+use chrono::NaiveDateTime;
 use color_eyre::eyre::{eyre, Result};
 use data_encoding::{BASE32, HEXLOWER};
 use regex::Regex;
@@ -23,7 +23,7 @@ pub trait ApiServer {
         keywords: &[String],
         subgroup_id: Option<i32>,
         res_type_id: Option<i32>,
-        publish_after: Option<DateTime<Local>>,
+        publish_after: Option<NaiveDateTime>,
     ) -> Result<(Vec<Res>, bool)>;
 }
 
@@ -38,7 +38,7 @@ pub struct Res {
     pub page_url: String,
     pub magnet: String,
     pub info_hash: String,
-    pub publish_date: DateTime<Local>,
+    pub publish_date: NaiveDateTime,
     pub seeding: String,
     pub leeching: String,
     pub finished: String,

@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
+use chrono::NaiveDateTime;
 use color_eyre::eyre::{Error, Result};
 use scraper::{Html, Selector};
 
@@ -64,7 +64,7 @@ impl ApiServer for Dmhy {
         keywords: &[String],
         sub_group_id: Option<i32>,
         res_type_id: Option<i32>,
-        publish_after: Option<DateTime<Local>>,
+        publish_after: Option<NaiveDateTime>,
     ) -> Result<(Vec<Res>, bool)> {
         let uri = format!(
             "{}/topics/list/page/1?keyword={}&sort_id={}&team_id={}&order=date-desc",
@@ -207,15 +207,13 @@ impl ApiServer for Dmhy {
     }
 }
 
-fn str_to_time(str: &str) -> DateTime<Local> {
-    Local
-        .from_local_datetime(&NaiveDateTime::parse_from_str(str, "%Y/%m/%d %R").unwrap())
-        .unwrap()
+fn str_to_time(str: &str) -> NaiveDateTime {
+    NaiveDateTime::parse_from_str(str, "%Y/%m/%d %R").unwrap()
 }
 
 #[cfg(test)]
 mod tests {
-    use chrono::{Local, TimeZone};
+    use chrono::NaiveDate;
 
     use super::*;
 
@@ -225,11 +223,17 @@ mod tests {
         let time = str_to_time(str);
         assert_eq!(
             time,
-            Local.with_ymd_and_hms(2021, 8, 26, 17, 17, 0).unwrap()
+            NaiveDate::from_ymd_opt(2021, 8, 26)
+                .unwrap()
+                .and_hms_opt(17, 17, 0)
+                .unwrap()
         );
         assert_ne!(
             time,
-            Local.with_ymd_and_hms(2021, 8, 26, 17, 17, 1).unwrap()
+            NaiveDate::from_ymd_opt(2021, 8, 26)
+                .unwrap()
+                .and_hms_opt(17, 17, 1)
+                .unwrap()
         );
     }
 }

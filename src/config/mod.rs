@@ -1,4 +1,4 @@
-use chrono::{DateTime, Local};
+use chrono::NaiveDateTime;
 use color_eyre::eyre::{eyre, Result};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -71,7 +71,7 @@ pub struct Rule {
     pub sub_group_name: Option<String>,
     pub res_type_id: Option<i32>,
     pub res_type_name: Option<String>,
-    pub publish_after: Option<DateTime<Local>>,
+    pub publish_after: Option<NaiveDateTime>,
 }
 
 #[derive(Debug, PartialEq, Eq, Deserialize, Serialize, Clone)]
@@ -278,7 +278,7 @@ mod tests {
         res_api = "dmhy"
         sub_group_id = 604
         sub_group_name = "c.c"
-        publish_after = "2022-10-01T11:11:0+08:00"
+        publish_after = "2022-10-01T11:11:00"
         #res_type_id = 2
         #res_type_name = "动画"
 
@@ -303,7 +303,12 @@ mod tests {
                     res_api: ResApi::Dmhy,
                     sub_group_id: Some(604),
                     sub_group_name: Some(String::from("c.c")),
-                    publish_after: Some(Local.with_ymd_and_hms(2022, 10, 1, 11, 11, 0).unwrap()),
+                    publish_after: Some(
+                        NaiveDate::from_ymd_opt(2022, 10, 1)
+                            .unwrap()
+                            .and_hms_opt(11, 11, 0)
+                            .unwrap()
+                    ),
                     res_type_id: None,
                     res_type_name: None
                 }],
