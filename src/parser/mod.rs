@@ -6,6 +6,7 @@ use color_eyre::eyre::{bail, eyre, Result};
 use lava_torrent::torrent::v1::Torrent;
 use regex::Regex;
 
+use crate::VIDEO_EXTS;
 use crate::{
     config,
     dl::{self},
@@ -181,6 +182,7 @@ where
  * 在其他块里寻找 语言sub, 清晰度res, 来源source
  */
 pub fn process(title: &str) -> Result<Episode> {
+    let original_title = title;
     //  1. 去除分割符号，分成多个小块
     let title = title.trim().replace('【', "[").replace('】', "]");
     let mut blocks = Regex::new(r"[\[\]]")
@@ -293,7 +295,9 @@ pub fn process(title: &str) -> Result<Episode> {
     }
 
     if maybe_ep.is_none() {
-        bail!("can't find episode number for title: {}", title);
+        return Ok(Episode::Sp {
+            name: original_title.to_string(),
+        });
     }
     if maybe_name_block_end_index.is_none() {
         bail!("can't find name block for title: {}", title);
@@ -315,7 +319,7 @@ pub fn process(title: &str) -> Result<Episode> {
         .filter(|s| !s.is_empty());
     let (sub, dpi, source) = find_tags_from_iter(tag_block_iter);
 
-    Ok(Episode {
+    Ok(Episode::Ep(Ep {
         sub_group: group,
         season: maybe_season.unwrap_or(1),
         name_en: maybe_name_en,
@@ -325,11 +329,17 @@ pub fn process(title: &str) -> Result<Episode> {
         sub,
         resolution: dpi,
         source,
-    })
+    }))
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Episode {
+pub enum Episode {
+    Ep(Ep),
+    Sp { name: String },
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Ep {
     sub_group: String,
     season: u8,
     pub name_en: Option<String>,
@@ -342,24 +352,38 @@ pub struct Episode {
 }
 
 impl Episode {
+    pub fn unwrap_ep(self) -> Ep {
+        match self {
+            Episode::Ep(ep) => ep,
+            _ => unreachable!("not a ep!"),
+        }
+    }
+
     pub fn name(&self, name_specific: Option<&str>) -> Result<String> {
         let mut name = None;
         if let Some(n) = name_specific {
             name = Some(n.to_string());
         } else {
-            if let Some(name_zh) = &self.name_zh {
-                if name.is_none() {
-                    name = Some(name_zh.clone());
+            match self {
+                Episode::Sp { name: sp_name } => {
+                    name = Some(sp_name.clone());
                 }
-            }
-            if let Some(name_jp) = &self.name_jp {
-                if name.is_none() {
-                    name = Some(name_jp.clone());
-                }
-            }
-            if let Some(name_en) = &self.name_en {
-                if name.is_none() {
-                    name = Some(name_en.clone());
+                Episode::Ep(ep) => {
+                    if let Some(name_zh) = &ep.name_zh {
+                        if name.is_none() {
+                            name = Some(name_zh.clone());
+                        }
+                    }
+                    if let Some(name_jp) = &ep.name_jp {
+                        if name.is_none() {
+                            name = Some(name_jp.clone());
+                        }
+                    }
+                    if let Some(name_en) = &ep.name_en {
+                        if name.is_none() {
+                            name = Some(name_en.clone());
+                        }
+                    }
                 }
             }
         }
@@ -367,12 +391,37 @@ impl Episode {
     }
 
     pub fn link_path(&self, name: &str) -> String {
-        link_path(name, &self.season)
+        link_path(
+            name,
+            match self {
+                Episode::Ep(ep) => &ep.season,
+                Episode::Sp { .. } => &0,
+            },
+        )
     }
 
     pub fn link_file_name(&self, name: &str) -> String {
-        link_file_name(name, &self.season, &self.episode)
+        match self {
+            Episode::Ep(ep) => link_file_name(name, &ep.season, &ep.episode),
+            Episode::Sp { name } => remove_video_ext_from(name),
+        }
     }
+
+    pub fn link_file_name_with_season(&self, name: &str, season: &u8) -> String {
+        match self {
+            Episode::Ep(ep) => link_file_name(name, season, &ep.episode),
+            Episode::Sp { name } => remove_video_ext_from(name),
+        }
+    }
+}
+
+fn remove_video_ext_from(name: &str) -> String {
+    for ext in VIDEO_EXTS.iter() {
+        if name.to_lowercase().ends_with(&format!(".{ext}")) {
+            return name[..name.len() - ext.len() - 1].to_string();
+        }
+    }
+    name.to_string()
 }
 
 pub fn link_path(name: &str, season: &u8) -> String {
@@ -474,10 +523,22 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_remove_video_ext_from() {
+        let name = "[Up to 21°C] 擅长逃跑的殿下 / Nige Jouzu no Wakagimi - 9.5 (Baha 1920x1080 AVC AAC MP4)";
+        assert_eq!(name, remove_video_ext_from(&name));
+        assert_eq!(name, remove_video_ext_from(&format!("{name}.mp4")));
+    }
+
+    #[test]
     fn test_parser() {
+        let ep = process("[Up to 21°C] 擅长逃跑的殿下 / Nige Jouzu no Wakagimi - 9.5 (Baha 1920x1080 AVC AAC MP4)");
+        assert!(
+            matches!(ep, Ok(Episode::Sp{ name }) if name == "[Up to 21°C] 擅长逃跑的殿下 / Nige Jouzu no Wakagimi - 9.5 (Baha 1920x1080 AVC AAC MP4)")
+        );
+
         let ep = process("【幻樱字幕组】【4月新番】【古见同学有交流障碍症 第二季 Komi-san wa, Komyushou Desu. S02】【22】【GB_MP4】【1920X1080】");
-        assert!(ep.is_ok());
-        let ep = ep.unwrap();
+        assert!(matches!(ep, Ok(Episode::Ep(_))));
+        let ep = ep.unwrap().unwrap_ep();
         assert_eq!(ep.sub_group, "幻樱字幕组");
         assert_eq!(ep.season, 2);
         assert_eq!(ep.name_en, Some("Komi-san wa, Komyushou Desu.".to_string()));
@@ -487,8 +548,8 @@ mod tests {
         assert_eq!(ep.resolution, Some("1920X1080".to_string()));
 
         let ep = process("[百冬练习组&LoliHouse] BanG Dream! 少女乐团派对！☆PICO FEVER！ / Garupa Pico: Fever! - 26 [WebRip 1080p HEVC-10bit AAC][简繁内封字幕][END] [101.69 MB]");
-        assert!(ep.is_ok());
-        let ep = ep.unwrap();
+        assert!(matches!(ep, Ok(Episode::Ep(_))));
+        let ep = ep.unwrap().unwrap_ep();
         assert_eq!(ep.sub_group, "百冬练习组&LoliHouse");
         assert_eq!(ep.season, 1);
         assert_eq!(ep.name_en, Some("Garupa Pico: Fever!".to_string()));
@@ -502,8 +563,8 @@ mod tests {
         assert_eq!(ep.source, Some("WebRip".to_string()));
 
         let ep =  process("【喵萌奶茶屋】★04月新番★[夏日重现/Summer Time Rendering][11][1080p][繁日双语][招募翻译]");
-        assert!(ep.is_ok());
-        let ep = ep.unwrap();
+        assert!(matches!(ep, Ok(Episode::Ep(_))));
+        let ep = ep.unwrap().unwrap_ep();
         assert_eq!(ep.sub_group, "喵萌奶茶屋");
         assert_eq!(ep.season, 1);
         assert_eq!(ep.name_en, Some("Summer Time Rendering".to_string()));
@@ -513,8 +574,8 @@ mod tests {
         assert_eq!(ep.resolution, Some("1080p".to_string()));
 
         let ep = process("[Lilith-Raws] 关于我在无意间被隔壁的天使变成废柴这件事 / Otonari no Tenshi-sama - 09 [Baha][WEB-DL][1080p][AVC AAC][CHT][MP4]");
-        assert!(ep.is_ok());
-        let ep = ep.unwrap();
+        assert!(matches!(ep, Ok(Episode::Ep(_))));
+        let ep = ep.unwrap().unwrap_ep();
         assert_eq!(ep.sub_group, "Lilith-Raws");
         assert_eq!(ep.season, 1);
         assert_eq!(ep.episode, 9);
@@ -528,8 +589,8 @@ mod tests {
         let ep = process(
             "[梦蓝字幕组]New Doraemon 哆啦A梦新番[747][2023.02.25][AVC][1080P][GB_JP][MP4]",
         );
-        assert!(ep.is_ok());
-        let ep = ep.unwrap();
+        assert!(matches!(ep, Ok(Episode::Ep(_))));
+        let ep = ep.unwrap().unwrap_ep();
         assert_eq!(ep.sub_group, "梦蓝字幕组");
         assert_eq!(ep.season, 1);
         assert_eq!(ep.episode, 747);
@@ -540,8 +601,8 @@ mod tests {
         let ep = process(
             "[织梦字幕组][尼尔：机械纪元 NieR Automata Ver1.1a][02集][1080P][AVC][简日双语]",
         );
-        assert!(ep.is_ok());
-        let ep = ep.unwrap();
+        assert!(matches!(ep, Ok(Episode::Ep(_))));
+        let ep = ep.unwrap().unwrap_ep();
         assert_eq!(ep.sub_group, "织梦字幕组");
         assert_eq!(ep.season, 1);
         assert_eq!(ep.episode, 2);
@@ -552,8 +613,8 @@ mod tests {
         let ep = process(
             "[MagicStar] 假面骑士Geats / 仮面ライダーギーツ EP33 [WEBDL] [1080p] [TTFC]【生】",
         );
-        assert!(ep.is_ok());
-        let ep = ep.unwrap();
+        assert!(matches!(ep, Ok(Episode::Ep(_))));
+        let ep = ep.unwrap().unwrap_ep();
         assert_eq!(ep.sub_group, "MagicStar");
         assert_eq!(ep.season, 1);
         assert_eq!(ep.episode, 33);
@@ -562,8 +623,8 @@ mod tests {
         assert_eq!(ep.resolution, Some("1080p".to_string()));
 
         let ep = process("【极影字幕社】★4月新番 天国大魔境 Tengoku Daimakyou 第05话 GB 720P MP4（字幕社招人内详）");
-        assert!(ep.is_ok());
-        let ep = ep.unwrap();
+        assert!(matches!(ep, Ok(Episode::Ep(_))));
+        let ep = ep.unwrap().unwrap_ep();
         assert_eq!(ep.sub_group, "极影字幕社");
         assert_eq!(ep.season, 1);
         assert_eq!(ep.episode, 5);
@@ -572,8 +633,8 @@ mod tests {
         assert_eq!(ep.resolution, Some("720P".to_string()));
 
         let ep = process("【极影字幕·毁片党】LoveLive! SunShine!! 幻日的夜羽 -SUNSHINE in the MIRROR- 第01集 TV版 HEVC_opus 1080p ");
-        assert!(ep.is_ok());
-        let ep = ep.unwrap();
+        assert!(matches!(ep, Ok(Episode::Ep(_))));
+        let ep = ep.unwrap().unwrap_ep();
         assert_eq!(ep.sub_group, "极影字幕·毁片党");
         assert_eq!(ep.season, 1);
         assert_eq!(ep.episode, 1);
@@ -584,8 +645,8 @@ mod tests {
         let ep = process(
             "[ANi] BLEACH 死神 千年血战篇-诀别谭- - 14 [1080P][Baha][WEB-DL][AAC AVC][CHT][MP4]",
         );
-        assert!(ep.is_ok());
-        let ep = ep.unwrap();
+        assert!(matches!(ep, Ok(Episode::Ep(_))));
+        let ep = ep.unwrap().unwrap_ep();
         assert_eq!(ep.sub_group, "ANi");
         assert_eq!(ep.season, 1);
         assert_eq!(ep.episode, 14);

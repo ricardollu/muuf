@@ -20,7 +20,6 @@ async fn main() -> Result<()> {
             println!(
                 "{:?}",
                 parser::process(file.path.file_name().unwrap().to_str().unwrap()) // file.path.to_str().unwrap()
-                    .map(|ep| (ep.name_en, ep.episode))
             );
         }
     });

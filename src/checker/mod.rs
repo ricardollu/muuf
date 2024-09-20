@@ -1,5 +1,3 @@
-const VIDEO_EXTS: [&str; 2] = ["mp4", "mkv"];
-
 mod collection;
 mod mikan;
 mod res_rule;

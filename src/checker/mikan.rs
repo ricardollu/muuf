@@ -7,11 +7,11 @@ use base64::{engine::general_purpose, Engine};
 use color_eyre::eyre::Result;
 
 use crate::{
-    checker::VIDEO_EXTS,
     config::{Link, Mikan},
     dl::{Client, Torrent},
     get_url_bytes, parser,
     rss::parse_mikan,
+    VIDEO_EXTS,
 };
 
 pub async fn check_mikan(

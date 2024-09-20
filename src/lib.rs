@@ -16,6 +16,8 @@ use directories::ProjectDirs;
 use tracing_error::ErrorLayer;
 use tracing_subscriber::{self, layer::SubscriberExt, util::SubscriberInitExt, Layer};
 
+const VIDEO_EXTS: [&str; 2] = ["mp4", "mkv"];
+
 pub static CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
     let mut client_builder = reqwest::Client::builder();
     if let Some(config) = config::Config::load().unwrap().proxy {

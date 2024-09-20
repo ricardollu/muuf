@@ -4,10 +4,11 @@ use base64::{engine::general_purpose, Engine};
 use color_eyre::eyre::{bail, Result};
 
 use crate::{
-    checker::VIDEO_EXTS,
     config::{Collection, Link, Matcher, SeasonFolder, SpecialMapping},
     dl::{Client, Torrent},
-    get_url_bytes, parser,
+    get_url_bytes,
+    parser::{self},
+    VIDEO_EXTS,
 };
 
 pub async fn check_collection(
@@ -91,8 +92,9 @@ pub async fn check_collection(
                             );
                             continue;
                         }
-                        let ep = maybe_real_ep.unwrap().episode;
-                        link_file_name = parser::link_file_name(name, season, &ep);
+                        link_file_name = maybe_real_ep
+                            .unwrap()
+                            .link_file_name_with_season(name, season);
                     }
 
                     let path = parser::link_path(name, season);
