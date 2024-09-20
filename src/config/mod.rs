@@ -86,6 +86,8 @@ pub struct Mikan {
     pub title_contain: Vec<String>,
     #[serde(default)]
     pub external_subtitle: bool,
+    #[serde(default)]
+    pub ep_revise: i8,
 }
 
 #[derive(Debug, PartialEq, Eq, Deserialize, Serialize, Clone)]
@@ -263,6 +265,7 @@ mod tests {
         skip = [{url="1", title="1"}]
         title_contain = ["4"]
         external_subtitle = true
+        ep_revise = -1
 
         [[mikan.extra]]
         title="2"
@@ -325,7 +328,8 @@ mod tests {
                             url: "1".to_string()
                         }],
                         title_contain: vec![String::from("4")],
-                        external_subtitle: true
+                        external_subtitle: true,
+                        ep_revise: -1,
                     },
                     Mikan {
                         url: "u2".to_string(),
@@ -333,7 +337,8 @@ mod tests {
                         extra: vec![],
                         skip: vec![],
                         title_contain: vec![],
-                        external_subtitle: false
+                        external_subtitle: false,
+                        ep_revise: 0,
                     }
                 ],
                 downloader: Downloader::Transmission(TransmissionConfig {
@@ -437,6 +442,7 @@ mod tests {
                 }],
                 title_contain: vec![String::from("4")],
                 external_subtitle: true,
+                ep_revise: -2,
             })
             .unwrap();
 
@@ -458,6 +464,7 @@ mod tests {
         external_subtitle = true
         extra = [{title="2", url="3"}]
         skip = [{title="1", url="1"}]
+        ep_revise = -2
         "#,
         )
         .unwrap();

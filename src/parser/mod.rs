@@ -413,6 +413,15 @@ impl Episode {
             Episode::Sp { name } => remove_video_ext_from(name),
         }
     }
+
+    pub fn revise_ep(&mut self, ep_revise: &i8) {
+        match self {
+            Episode::Ep(ep) => {
+                ep.episode = (ep.episode as i32 + *ep_revise as i32) as u32;
+            }
+            _ => {}
+        }
+    }
 }
 
 fn remove_video_ext_from(name: &str) -> String {

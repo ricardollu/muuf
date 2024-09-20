@@ -9,7 +9,8 @@ use color_eyre::eyre::Result;
 use crate::{
     config::{Link, Mikan},
     dl::{Client, Torrent},
-    get_url_bytes, parser,
+    get_url_bytes,
+    parser::{self, Episode},
     rss::parse_mikan,
     VIDEO_EXTS,
 };
@@ -91,7 +92,7 @@ pub async fn check_mikan(
                     // If the torrent contains only 1 file then name is the file name. Otherwise it’s the suggested root directory’s name.
                     // let file_name_from_torrent = &torrent.name;
                     let file_suffix = file_name_from_torrent.split('.').last().unwrap();
-                    let ep = parser::process(&title)?;
+                    let ep = process(&title, &m)?;
                     let name = ep.name(Some(&m.name))?;
                     let path = ep.link_path(&name);
                     let link_file_name = ep.link_file_name(&name);
@@ -147,4 +148,31 @@ pub async fn check_mikan(
     }
 
     Ok(())
+}
+
+fn process(title: &str, m: &Mikan) -> Result<Episode> {
+    let mut ep = parser::process(&title)?;
+    ep.revise_ep(&m.ep_revise);
+    Ok(ep)
+}
+
+#[cfg(test)]
+mod tests {
+    use parser::Ep;
+
+    use super::*;
+
+    #[test]
+    fn test_process() {
+        let mikan = toml::from_str::<Mikan>(
+            r#"
+            name = ""
+            url = ""
+            ep_revise = -48
+            "#,
+        )
+        .unwrap();
+        let ep = process("[Up to 21°C] 关于我转生变成史莱姆这档事 第三季 / Tensei shitara Slime Datta Ken 3rd Season - 49 (Baha 1920x1080 AVC AAC MP4)", &mikan);
+        assert!(matches!(ep, Ok(Episode::Ep(Ep {episode, ..})) if episode == 1 ))
+    }
 }
