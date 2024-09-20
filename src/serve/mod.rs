@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    checker::check,
+    checker::check_everything,
     config::{Collection, Config, Mikan},
 };
 use axum::{
@@ -142,6 +142,6 @@ async fn rm_collection(Json(form): Json<RmCollectionForm>) -> (StatusCode, Json<
 }
 
 async fn request_check() -> (StatusCode, Json<ApiResponse>) {
-    tokio::spawn(async move { check().await });
+    tokio::spawn(async move { check_everything().await });
     to_resp(StatusCode::OK, "check requested".to_string())
 }

@@ -1,6 +1,11 @@
 use clap::{Parser, Subcommand};
 use color_eyre::eyre::Result;
-use muuf::{checker::check, config::Config, initialize_logging_from_crate_name, serve::serve};
+use muuf::{
+    checker::{check, check_everything},
+    config::Config,
+    initialize_logging_from_crate_name,
+    serve::serve,
+};
 use tracing::info;
 
 #[tokio::main]
@@ -12,7 +17,11 @@ async fn main() -> Result<()> {
     match cli.commands {
         Commands::Watch => watch().await,
         Commands::Serve => serve().await,
-        Commands::Check => check().await?,
+        Commands::Check {
+            collection,
+            mikan,
+            res,
+        } => check(collection, mikan, res).await?,
         Commands::Validate => validate(),
     }
 
@@ -29,7 +38,7 @@ async fn watch() {
     tokio::spawn(async move {
         let interval = config.check_interval;
         loop {
-            let _ = check().await;
+            let _ = check_everything().await;
             tokio::time::sleep(tokio::time::Duration::from_secs(interval)).await;
         }
     });
@@ -50,7 +59,14 @@ enum Commands {
     /// 仅提供API
     Serve,
     /// 检查一次
-    Check,
+    Check {
+        #[clap(short, long)]
+        collection: bool,
+        #[clap(short, long)]
+        mikan: bool,
+        #[clap(short, long)]
+        res: bool,
+    },
     /// 校验
     Validate,
 }
