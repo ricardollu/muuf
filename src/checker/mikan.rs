@@ -92,7 +92,7 @@ pub async fn check_mikan(
                     // If the torrent contains only 1 file then name is the file name. Otherwise it’s the suggested root directory’s name.
                     // let file_name_from_torrent = &torrent.name;
                     let file_suffix = file_name_from_torrent.split('.').last().unwrap();
-                    let ep = process(&title, &m)?;
+                    let ep = process(&title, m)?;
                     let name = ep.name(Some(&m.name))?;
                     let path = ep.link_path(&name);
                     let link_file_name = ep.link_file_name(&name);
@@ -151,7 +151,7 @@ pub async fn check_mikan(
 }
 
 fn process(title: &str, m: &Mikan) -> Result<Episode> {
-    let mut ep = parser::process(&title)?;
+    let mut ep = parser::process(title)?;
     ep.revise_ep(&m.ep_revise);
     Ok(ep)
 }

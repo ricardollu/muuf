@@ -415,11 +415,8 @@ impl Episode {
     }
 
     pub fn revise_ep(&mut self, ep_revise: &i8) {
-        match self {
-            Episode::Ep(ep) => {
-                ep.episode = (ep.episode as i32 + *ep_revise as i32) as u32;
-            }
-            _ => {}
+        if let Episode::Ep(ep) = self {
+            ep.episode = (ep.episode as i32 + *ep_revise as i32) as u32;
         }
     }
 }
@@ -534,7 +531,7 @@ mod tests {
     #[test]
     fn test_remove_video_ext_from() {
         let name = "[Up to 21°C] 擅长逃跑的殿下 / Nige Jouzu no Wakagimi - 9.5 (Baha 1920x1080 AVC AAC MP4)";
-        assert_eq!(name, remove_video_ext_from(&name));
+        assert_eq!(name, remove_video_ext_from(name));
         assert_eq!(name, remove_video_ext_from(&format!("{name}.mp4")));
     }
 
