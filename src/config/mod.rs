@@ -146,6 +146,13 @@ pub struct Link {
     pub path: String,
     #[serde(default)]
     pub dry_run: bool,
+    pub notify: Option<LinkNotify>,
+}
+
+#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub enum LinkNotify {
+    Ntfy { channel: String },
 }
 
 const CONFIG_FILE_NAME: &str = "muuf.toml";
@@ -258,6 +265,7 @@ mod tests {
         enable = false
         path = "/downloads/link"
         dry_run = true
+        notify = { type = "Ntfy", channel = "c" }
 
         [[mikan]]
         url = "u1"
@@ -356,7 +364,10 @@ mod tests {
                 link: Some(Link {
                     enable: false,
                     path: "/downloads/link".to_string(),
-                    dry_run: true
+                    dry_run: true,
+                    notify: Some(LinkNotify::Ntfy {
+                        channel: "c".to_string()
+                    })
                 }),
                 collections: vec![Collection {
                     torrent_url: "u".to_string(),
