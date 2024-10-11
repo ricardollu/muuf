@@ -3,7 +3,7 @@ use color_eyre::eyre::{eyre, Result};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::get_data_dir;
+use crate::{get_data_dir, notify::Notify};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
@@ -146,13 +146,7 @@ pub struct Link {
     pub path: String,
     #[serde(default)]
     pub dry_run: bool,
-    pub notify: Option<LinkNotify>,
-}
-
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(tag = "type")]
-pub enum LinkNotify {
-    Ntfy { channel: String },
+    pub notify: Option<Notify>,
 }
 
 const CONFIG_FILE_NAME: &str = "muuf.toml";
@@ -265,7 +259,7 @@ mod tests {
         enable = false
         path = "/downloads/link"
         dry_run = true
-        notify = { type = "Ntfy", channel = "c" }
+        notify = { type = "Ntfy", topic = "c" }
 
         [[mikan]]
         url = "u1"
@@ -365,8 +359,8 @@ mod tests {
                     enable: false,
                     path: "/downloads/link".to_string(),
                     dry_run: true,
-                    notify: Some(LinkNotify::Ntfy {
-                        channel: "c".to_string()
+                    notify: Some(Notify::Ntfy {
+                        topic: "c".to_string()
                     })
                 }),
                 collections: vec![Collection {

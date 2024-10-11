@@ -1,6 +1,7 @@
 pub mod checker;
 pub mod config;
 pub mod dl;
+pub mod notify;
 pub mod parser;
 pub mod res;
 pub mod rss;

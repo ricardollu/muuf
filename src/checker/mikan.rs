@@ -113,7 +113,11 @@ pub async fn check_mikan(
                                 Ok(_) => {
                                     println!(
                                         "创建链接{link} <- {storage_path}{file_name_from_torrent}"
-                                    )
+                                    );
+                                    // send notify when link success
+                                    if let Some(notify) = &link_config.notify {
+                                        notify.link_success(&link_file_name).await?;
+                                    }
                                 }
                                 Err(e) => println!("硬链接失败: {} 当{link} <- {original}", e),
                             }
