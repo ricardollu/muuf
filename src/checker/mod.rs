@@ -12,7 +12,7 @@ use crate::{
     config::{Collection, Config, Link, Mikan, Rule},
     dl::{self, Client},
 };
-use color_eyre::eyre::{anyhow, Result};
+use color_eyre::eyre::{eyre, Result};
 use tracing::{error, info};
 
 pub static LAST_CHECK_RESULT: Mutex<Option<Result<()>>> = Mutex::new(None);
@@ -28,7 +28,10 @@ pub async fn check(collection: bool, mikan: bool, res: bool) -> Result<()> {
         error!("{:?}", e);
     }
     if let Ok(mut last_check_result) = LAST_CHECK_RESULT.lock() {
-        *last_check_result = Some(Err(anyhow!("last check failed")));
+        *last_check_result = Some(match &result {
+            Ok(_) => Ok(()),
+            Err(_) => Err(eyre!("check failed")),
+        });
     };
     result
 }
