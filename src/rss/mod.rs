@@ -30,17 +30,19 @@ struct MikanRssItemEnclosure {
     url: String,
 }
 
-pub async fn parse_mikan(url: &str) -> Result<Vec<(String, String, Result<Bytes>)>> {
+pub async fn parse_mikan(url: &str) -> Result<Vec<(String, String, Bytes)>> {
     let rss_text = CLIENT.get(url).send().await?.text().await?;
     let r = quick_xml::de::from_str::<MikanRssContainer>(&rss_text)?;
 
     let x = r.channel.items.iter().map(|item| async {
-        (
-            item.title.to_string(),
-            item.enclosure.url.to_string(),
-            get_url_bytes(&item.enclosure.url).await,
-        )
+        match get_url_bytes(&item.enclosure.url).await {
+            Ok(bytes) => Ok((
+                item.title.to_string(),
+                item.enclosure.url.to_string(),
+                bytes,
+            )),
+            Err(e) => Err(e),
+        }
     });
-
-    Ok(futures::future::join_all(x).await)
+    futures::future::join_all(x).await.into_iter().collect()
 }

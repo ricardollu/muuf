@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    checker::check_everything,
+    checker::{check_everything, LAST_CHECK_RESULT},
     config::{Collection, Config, Mikan},
 };
 use axum::{
@@ -44,6 +44,7 @@ pub async fn serve() {
     let app = Router::new()
         .route("/", any(|| async { "Hello, World!" }))
         .route("/request-check", post(request_check))
+        .route("/health/check", get(check_healthy))
         .route("/mikan", get(find_mikan))
         .route("/add-mikan", post(add_mikan))
         .route("/rm-mikan", post(rm_mikan))
@@ -144,4 +145,16 @@ async fn rm_collection(Json(form): Json<RmCollectionForm>) -> (StatusCode, Json<
 async fn request_check() -> (StatusCode, Json<ApiResponse>) {
     tokio::spawn(async move { check_everything().await });
     to_resp(StatusCode::OK, "check requested".to_string())
+}
+
+async fn check_healthy() -> (StatusCode, Json<ApiResponse>) {
+    let last_check_result = LAST_CHECK_RESULT.lock().unwrap();
+    if last_check_result.is_none() || last_check_result.as_ref().unwrap().is_ok() {
+        to_resp(StatusCode::OK, "last check is healthy".to_string())
+    } else {
+        to_resp(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "last check is not healthy".to_string(),
+        )
+    }
 }

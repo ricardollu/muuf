@@ -1,10 +1,11 @@
 use std::{
+    ffi::OsStr,
     fs,
     path::{Path, PathBuf},
 };
 
 use base64::{engine::general_purpose, Engine};
-use color_eyre::eyre::Result;
+use color_eyre::eyre::{eyre, Result};
 
 use crate::{
     config::{Link, Mikan},
@@ -24,12 +25,8 @@ pub async fn check_mikan(
 ) -> Result<()> {
     let mut ts = parse_mikan(&m.url).await?;
     for e in &m.extra {
-        ts.push((e.title.clone(), e.url.clone(), get_url_bytes(&e.url).await));
+        ts.push((e.title.clone(), e.url.clone(), get_url_bytes(&e.url).await?));
     }
-    let ts = ts
-        .into_iter()
-        .filter(|(_, _, maybe_bytes)| maybe_bytes.is_ok())
-        .map(|(a, b, c)| (a, b, c.unwrap()));
 
     for (title, url, bytes) in ts {
         if m.skip.iter().any(|s| {
@@ -57,12 +54,30 @@ pub async fn check_mikan(
         // If the torrent contains only 1 file then files is None.
         let (file_name_from_torrent, file_stem, storage_path) = if torrent.files.is_some() {
             let mut some_file_name_from_torrent = None;
-            for file in torrent.files.as_ref().unwrap() {
-                let file_suffix = file.path.extension().unwrap().to_str().unwrap();
+            for file in torrent
+                .files
+                .as_ref()
+                .ok_or_else(|| eyre!("torrent has only one file: {title}"))?
+            {
+                let file_suffix = file
+                    .path
+                    .extension()
+                    .and_then(OsStr::to_str)
+                    .ok_or_else(|| eyre!("get ext & to_str failed: {:?}", file.path))?;
                 if VIDEO_EXTS.iter().any(|ext| ext == &file_suffix) {
                     some_file_name_from_torrent = Some((
-                        file.path.file_name().unwrap().to_str().unwrap(),
-                        file.path.file_stem().unwrap().to_str().unwrap(),
+                        file.path
+                            .file_name()
+                            .and_then(OsStr::to_str)
+                            .ok_or_else(|| {
+                                eyre!("get file_name & to_str failed: {:?}", file.path)
+                            })?,
+                        file.path
+                            .file_stem()
+                            .and_then(OsStr::to_str)
+                            .ok_or_else(|| {
+                                eyre!("get file_stem & to_str failed: {:?}", file.path)
+                            })?,
                         format!("{}/", &torrent.name),
                     ));
                     break;
@@ -77,7 +92,12 @@ pub async fn check_mikan(
         } else {
             (
                 torrent.name.as_str(),
-                pathbuf_torrent_name.file_stem().unwrap().to_str().unwrap(),
+                pathbuf_torrent_name
+                    .file_stem()
+                    .and_then(OsStr::to_str)
+                    .ok_or_else(|| {
+                        eyre!("get file_stem & to_str failed: {:?}", pathbuf_torrent_name)
+                    })?,
                 "".to_string(),
             )
         };
@@ -91,7 +111,10 @@ pub async fn check_mikan(
                 {
                     // If the torrent contains only 1 file then name is the file name. Otherwise it’s the suggested root directory’s name.
                     // let file_name_from_torrent = &torrent.name;
-                    let file_suffix = file_name_from_torrent.split('.').last().unwrap();
+                    let file_suffix =
+                        file_name_from_torrent.split('.').last().ok_or_else(|| {
+                            eyre!("get file_suffix failed: {:?}", file_name_from_torrent)
+                        })?;
                     let ep = process(&title, m)?;
                     let name = ep.name(Some(&m.name))?;
                     let path = ep.link_path(&name);

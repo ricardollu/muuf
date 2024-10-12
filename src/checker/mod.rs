@@ -2,6 +2,8 @@ mod collection;
 mod mikan;
 mod res_rule;
 
+use std::sync::Mutex;
+
 pub use collection::check_collection;
 pub use mikan::check_mikan;
 pub use res_rule::check_res_rule;
@@ -10,16 +12,13 @@ use crate::{
     config::{Collection, Config, Link, Mikan, Rule},
     dl::{self, Client},
 };
-use color_eyre::eyre::Result;
+use color_eyre::eyre::{anyhow, Result};
 use tracing::{error, info};
 
+pub static LAST_CHECK_RESULT: Mutex<Option<Result<()>>> = Mutex::new(None);
+
 pub async fn check_everything() -> Result<()> {
-    let config = Config::load()?;
-    let result = check_with_config(&config, true, true, true).await;
-    if let Err(e) = &result {
-        error!("{:?}", e);
-    }
-    result
+    check(true, true, true).await
 }
 
 pub async fn check(collection: bool, mikan: bool, res: bool) -> Result<()> {
@@ -28,6 +27,9 @@ pub async fn check(collection: bool, mikan: bool, res: bool) -> Result<()> {
     if let Err(e) = &result {
         error!("{:?}", e);
     }
+    if let Ok(mut last_check_result) = LAST_CHECK_RESULT.lock() {
+        *last_check_result = Some(Err(anyhow!("last check failed")));
+    };
     result
 }
 
