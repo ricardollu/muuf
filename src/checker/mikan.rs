@@ -54,17 +54,19 @@ pub async fn check_mikan(
         // If the torrent contains only 1 file then files is None.
         let (file_name_from_torrent, file_stem, storage_path) = if torrent.files.is_some() {
             let mut some_file_name_from_torrent = None;
-            for file in torrent
-                .files
-                .as_ref()
-                .ok_or_else(|| eyre!("torrent has only one file: {title}"))?
-            {
+            let mut is_multi_video_files = false;
+            // files is Some checked
+            for file in torrent.files.as_ref().unwrap() {
                 let file_suffix = file
                     .path
                     .extension()
                     .and_then(OsStr::to_str)
                     .ok_or_else(|| eyre!("get ext & to_str failed: {:?}", file.path))?;
                 if VIDEO_EXTS.iter().any(|ext| ext == &file_suffix) {
+                    if some_file_name_from_torrent.is_some() {
+                        is_multi_video_files = true;
+                        break;
+                    }
                     some_file_name_from_torrent = Some((
                         file.path
                             .file_name()
@@ -80,8 +82,11 @@ pub async fn check_mikan(
                             })?,
                         format!("{}/", &torrent.name),
                     ));
-                    break;
                 }
+            }
+            if is_multi_video_files {
+                println!("跳过多个视频文件的多文件种子: {}", title);
+                continue;
             }
             if let Some(n) = some_file_name_from_torrent {
                 n
@@ -115,7 +120,12 @@ pub async fn check_mikan(
                         file_name_from_torrent.split('.').last().ok_or_else(|| {
                             eyre!("get file_suffix failed: {:?}", file_name_from_torrent)
                         })?;
-                    let ep = process(&title, m)?;
+                    let parse_ep_result = process(&title, m);
+                    if parse_ep_result.is_err() {
+                        println!("解析'{title}'失败: {}", parse_ep_result.unwrap_err());
+                        continue;
+                    }
+                    let ep = parse_ep_result.unwrap();
                     let name = ep.name(Some(&m.name))?;
                     let path = ep.link_path(&name);
                     let link_file_name = ep.link_file_name(&name);
