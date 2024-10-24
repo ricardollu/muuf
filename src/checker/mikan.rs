@@ -5,6 +5,7 @@ use std::{
 };
 
 use base64::{engine::general_purpose, Engine};
+use bytes::Bytes;
 use color_eyre::eyre::{eyre, Result};
 
 use crate::{
@@ -23,27 +24,26 @@ pub async fn check_mikan(
     added_torrent_hashs: &mut Vec<String>,
     maybe_link: &Option<Link>,
 ) -> Result<()> {
-    let mut ts = parse_mikan(&m.url).await?;
+    let mut ts = parse_mikan(&m.url)
+        .await?
+        .into_iter()
+        .filter(|(title, url, _)| {
+            !m.skip.iter().any(|s| {
+                if s.title.trim() == "" {
+                    url.trim() == s.url.trim()
+                } else if s.url.trim() == "" {
+                    title.trim() == s.title.trim()
+                } else {
+                    title.trim() == s.title.trim() && url.trim() == s.url.trim()
+                }
+            }) && m.title_contain.iter().all(|s| title.contains(s))
+        })
+        .collect::<Vec<(String, String, Bytes)>>();
     for e in &m.extra {
         ts.push((e.title.clone(), e.url.clone(), get_url_bytes(&e.url).await?));
     }
 
-    for (title, url, bytes) in ts {
-        if m.skip.iter().any(|s| {
-            if s.title.trim() == "" {
-                url.trim() == s.url.trim()
-            } else if s.url.trim() == "" {
-                title.trim() == s.title.trim()
-            } else {
-                title.trim() == s.title.trim() && url.trim() == s.url.trim()
-            }
-        }) {
-            continue;
-        }
-        if !m.title_contain.iter().all(|s| title.contains(s)) {
-            continue;
-        }
-
+    for (title, _, bytes) in ts {
         if title.contains("合集") {
             // println!("跳过合集: {} ", title);
             continue;
