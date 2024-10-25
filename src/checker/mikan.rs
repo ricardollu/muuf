@@ -125,7 +125,13 @@ pub async fn check_mikan(
                         println!("解析'{title}'失败: {}", parse_ep_result.unwrap_err());
                         continue;
                     }
-                    let ep = parse_ep_result.unwrap();
+                    let mut ep = parse_ep_result.unwrap();
+
+                    // if season specified in config, use it to override the season parsed from title
+                    if let Some(season) = m.season {
+                        ep = ep.with_season(season)
+                    }
+
                     let name = ep.name(Some(&m.name))?;
                     let path = ep.link_path(&name);
                     let link_file_name = ep.link_file_name(&name);

@@ -359,6 +359,13 @@ impl Episode {
         }
     }
 
+    pub fn with_season(self, season: u8) -> Episode {
+        match self {
+            Episode::Ep(ep) => Episode::Ep(Ep { season, ..ep }),
+            Episode::Sp { name } => Episode::Sp { name: name.clone() },
+        }
+    }
+
     pub fn name(&self, name_specific: Option<&str>) -> Result<String> {
         let mut name = None;
         if let Some(n) = name_specific {
