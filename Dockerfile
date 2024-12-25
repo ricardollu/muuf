@@ -1,4 +1,4 @@
-FROM docker.io/rust:latest as builder
+FROM docker.io/rust:latest AS builder
 WORKDIR /usr/src/app
 COPY . .
 RUN cargo build --release
